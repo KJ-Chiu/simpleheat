@@ -117,31 +117,31 @@ simpleheat.prototype = {
 
         return this;
     },
-    
+
     drawWithBG: function (minOpacity, bgColor) {
-        if (!this._circle) this.radius(this.defaultRadius);
-        if (!this._grad) this.gradient(this.defaultGradient);
+        this.draw(minOpacity);
 
         var ctx = this._ctx;
 
-        ctx.clearRect(0, 0, this._width, this._height);
-        
-        ctx.beginPath();
-        ctx.rect(0, 0, this._width, this._height);
-        ctx.fillStyle = bgColor;
-        ctx.stroke();
+        // https://stackoverflow.com/questions/2049230/convert-rgba-color-to-rgb
+        // Source => Target = (BGColor + Source) =
+        // Target.R = ((1 - Source.A) * BGColor.R) + (Source.A * Source.R)
+        // Target.G = ((1 - Source.A) * BGColor.G) + (Source.A * Source.G)
+        // Target.B = ((1 - Source.A) * BGColor.B) + (Source.A * Source.B)
 
-        // draw a grayscale heatmap by putting a blurred circle at each data point
-        for (var i = 0, len = this._data.length, p; i < len; i++) {
-            p = this._data[i];
-            ctx.globalAlpha = Math.min(Math.max(p[2] / this._max, minOpacity === undefined ? 0.05 : minOpacity), 1);
-            ctx.drawImage(this._circle, p[0] - this._r, p[1] - this._r);
+        const imgData = ctx.getImageData(0, 0, this._width, this._height);
+        const data = imgData.data;
+        for (let i = 0; i < data.length; i += 4) {
+            const r = data[i] / 255;
+            const g = data[i + 1] / 255;
+            const b = data[i + 2] / 255;
+            const a = data[i + 3] / 255;
+            data[i] = ((1 - a) * (bgColor[0] / 255) + a * r) * 255;
+            data[i + 1] = ((1 - a) * (bgColor[1] / 255) + a * g) * 255;
+            data[i + 2] = ((1 - a) * (bgColor[2] / 255) + a * b) * 255;
+            data[i + 3] = 255;
         }
-
-        // colorize the heatmap, using opacity value of each pixel to get the right color from our gradient
-        var colored = ctx.getImageData(0, 0, this._width, this._height);
-        this._colorize(colored.data, this._grad);
-        ctx.putImageData(colored, 0, 0);
+        ctx.putImageData(imgData, 0, 0);
 
         return this;
     },
